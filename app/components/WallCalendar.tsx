@@ -231,7 +231,7 @@ function NotesSection({
 }) {
   const [text, setText] = useState('');
   const [showSaved, setShowSaved] = useState(false);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const prevKeyRef = useRef(noteKey);
 
   // Load notes when key changes
