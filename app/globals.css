@@ -403,6 +403,35 @@ body {
    ================================================================ */
 .calendar-grid-wrapper {
   flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Swipe hint for mobile */
+.calendar-grid-wrapper::after {
+  content: '← swipe →';
+  display: none;
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  opacity: 0.5;
+  letter-spacing: 2px;
+  pointer-events: none;
+}
+
+@media (max-width: 1024px) {
+  .calendar-grid-wrapper::after {
+    display: block;
+  }
+}
+
+/* Prevent text selection while dragging */
+.calendar-grid-wrapper:active {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .weekday-header {

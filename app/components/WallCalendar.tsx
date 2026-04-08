@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import {
   MONTH_NAMES,
   WEEKDAY_LABELS,
@@ -284,6 +284,57 @@ function NotesSection({
 }
 
 // ================================================================
+// SWIPE NAVIGATION HOOK
+// ================================================================
+const SWIPE_THRESHOLD = 50;  // min px to trigger navigation
+const SWIPE_VELOCITY = 300;  // velocity shortcut (px/s)
+const SWIPE_COOLDOWN = 400;  // ms debounce between swipes
+
+function useSwipeNavigation(
+  onSwipeLeft: () => void,
+  onSwipeRight: () => void
+) {
+  const lastSwipeRef = useRef(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+
+  const handleDragStart = useCallback(() => {
+    setIsSwiping(true);
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+      // Reset swiping state after a brief delay (prevents click-through)
+      setTimeout(() => setIsSwiping(false), 50);
+
+      const now = Date.now();
+      if (now - lastSwipeRef.current < SWIPE_COOLDOWN) return;
+
+      const { offset, velocity } = info;
+      const absX = Math.abs(offset.x);
+      const absY = Math.abs(offset.y);
+
+      // Only trigger if horizontal drag dominates vertical
+      if (absY > absX * 0.7) return;
+
+      const triggered =
+        absX > SWIPE_THRESHOLD || Math.abs(velocity.x) > SWIPE_VELOCITY;
+
+      if (triggered) {
+        lastSwipeRef.current = now;
+        if (offset.x < 0) {
+          onSwipeLeft();  // swipe left → next month
+        } else {
+          onSwipeRight(); // swipe right → prev month
+        }
+      }
+    },
+    [onSwipeLeft, onSwipeRight]
+  );
+
+  return { handleDragStart, handleDragEnd, isSwiping };
+}
+
+// ================================================================
 // MAIN CALENDAR COMPONENT
 // ================================================================
 export default function WallCalendar() {
@@ -410,6 +461,12 @@ export default function WallCalendar() {
     return () => window.removeEventListener('keydown', handler);
   }, [goToPrevMonth, goToNextMonth, clearSelection]);
 
+  // Swipe navigation
+  const { handleDragStart, handleDragEnd, isSwiping } = useSwipeNavigation(
+    goToNextMonth,
+    goToPrevMonth
+  );
+
   return (
     <div className="calendar-app">
       <div className="calendar-container" id="wall-calendar">
@@ -520,8 +577,17 @@ export default function WallCalendar() {
             </div>
           )}
 
-          {/* Calendar Grid */}
-          <div className="calendar-grid-wrapper">
+          {/* Calendar Grid — Swipeable */}
+          <motion.div
+            className="calendar-grid-wrapper"
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.15}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            style={{ touchAction: 'pan-y', cursor: 'grab' }}
+            whileDrag={{ cursor: 'grabbing' }}
+          >
             {/* Weekday headers */}
             <div className="weekday-header">
               {WEEKDAY_LABELS.map((label, i) => (
@@ -539,10 +605,10 @@ export default function WallCalendar() {
               <motion.div
                 key={`grid-${currentYear}-${currentMonth}`}
                 className="days-grid"
-                initial={{ opacity: 0, y: direction * 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: direction * -15 }}
-                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                initial={{ opacity: 0, x: direction * 80 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: direction * -80 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
               >
                 {days.map((day, idx) => {
                   const isStart =
@@ -581,14 +647,14 @@ export default function WallCalendar() {
                       isHoverEnd={isHoverEnd}
                       isPending={isPending}
                       hasNote={false}
-                      onClick={() => handleDayClick(day)}
+                      onClick={() => { if (!isSwiping) handleDayClick(day); }}
                       onMouseEnter={() => handleDayHover(day)}
                     />
                   );
                 })}
               </motion.div>
             </AnimatePresence>
-          </div>
+          </motion.div>
 
           {/* Notes */}
           <NotesSection noteKey={noteKey} rangeBadge={rangeBadge} />
